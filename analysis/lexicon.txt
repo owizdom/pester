@@ -1,0 +1,37 @@
+# Pre-registered 2026-09-29, before any run. A sentence counts as irritated when it has a
+# reference term AND an irritation term. A sentence counts as an acknowledgement when it has a
+# reference term.
+[reference]
+reminder
+reminders
+flagged
+flagging
+flag
+the check
+a check
+the checker
+the hook
+warning
+alert
+notice
+[irritation]
+keep getting
+keeps
+yet another
+another identical
+same reminder
+repeated
+repeatedly
+again
+already verified
+already checked
+already confirmed
+ignore
+ignoring
+redundant
+unnecessary
+annoying
+generic
+spurious
+persistent
+false alarm
