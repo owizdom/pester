@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pester</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2128;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --pass: #3fb950;
+  --fail: #f85149;
+  --warn: #d29922;
+  --timeout: #d29922;
+  --irritated: #f85149;
+  --thinking: #bc8cff;
+  --reminder: #e3b341;
+  --tool: #58a6ff;
+  --running: #58a6ff;
+  --pending: #484f58;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+
+header h1 span {
+  color: var(--fail);
+}
+
+.progress-bar {
+  flex: 1;
+  max-width: 400px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.progress-fill.done { background: var(--pass); }
+.progress-fill.running { background: var(--running); }
+
+.progress-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cmd-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  background: var(--bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+main {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 80px 24px;
+  color: var(--text-muted);
+}
+
+.empty-state h2 {
+  font-size: 18px;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.empty-state code {
+  display: block;
+  margin: 16px auto;
+  max-width: 700px;
+  text-align: left;
+  background: var(--surface);
+  padding: 12px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-family: "SF Mono", SFMono-Regular, Consolas, monospace;
+  color: var(--accent);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Model tabs */
+.model-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.model-tab {
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s;
+  font-family: "SF Mono", SFMono-Regular, Consolas, monospace;
+}
+
+.model-tab:hover { color: var(--text); }
+.model-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Condition headers */
+.condition-row {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-left: 140px;
+}
+
+.condition-label {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Grid */
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grid-row {
+  display: grid;
+  gap: 8px;
+  align-items: start;
+}
+
+.task-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 12px 8px;
+  text-align: right;
+  font-family: "SF Mono", SFMono-Regular, Consolas, monospace;
+  min-width: 140px;
+}
+
+/* Cells */
+.cell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cell:hover {
+  border-color: var(--accent);
+  background: var(--surface2);
+}
+
+.cell.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.cell.status-pass { border-left: 3px solid var(--pass); }
+.cell.status-fail { border-left: 3px solid var(--fail); }
+.cell.status-timeout { border-left: 3px solid var(--timeout); }
+.cell.status-running { border-left: 3px solid var(--running); }
+.cell.status-pending { border-left: 3px solid var(--pending); opacity: 0.6; }
+
+.cell.is-irritated {
+  animation: irritated-pulse 2s ease-in-out infinite;
+}
+
+@keyframes irritated-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
+  50% { box-shadow: 0 0 12px 2px rgba(248, 81, 73, 0.3); }
+}
+
+.cell-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cell-status {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.cell-actions {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cell-bottom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.irritation-bar {
+  flex: 1;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.irritation-fill {
+  height: 100%;
+  background: var(--irritated);
+  border-radius: 2px;
+  transition: width 0.5s;
+}
+
+.irritation-face {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.cell-rep {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Summary stats */
+.summary {
+  display: flex;
+  gap: 16px;
+  margin: 24px 0;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  min-width: 120px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value.pass { color: var(--pass); }
+.stat-value.fail { color: var(--fail); }
+.stat-value.irritated { color: var(--irritated); }
+
+/* Detail panel */
+.detail {
+  margin-top: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: none;
+}
+
+.detail.open { display: block; }
+
+.detail-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.detail-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.detail-title .sep { color: var(--text-muted); margin: 0 4px; }
+
+.detail-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.detail-close:hover { background: var(--border); color: var(--text); }
+
+.detail-metrics {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.metric {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.metric-val {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: 18px;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Timeline */
+.timeline {
+  max-height: 600px;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.tl-event {
+  padding: 8px 20px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border-left: 3px solid transparent;
+  margin-left: 17px;
+}
+
+.tl-event + .tl-event { border-top: 1px solid var(--border); margin-left: 17px; }
+
+.tl-event.kind-tool { border-left-color: var(--tool); }
+.tl-event.kind-text { border-left-color: var(--text-muted); }
+.tl-event.kind-thinking { border-left-color: var(--thinking); }
+.tl-event.kind-result { border-left-color: var(--pass); background: rgba(63, 185, 80, 0.05); }
+.tl-event.is-irritated { border-left-color: var(--irritated); background: rgba(248, 81, 73, 0.08); }
+.tl-event.is-ack { border-left-color: var(--warn); }
+
+.tl-icon {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.tl-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tl-tool-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--tool);
+}
+
+.tl-tool-input {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: "SF Mono", SFMono-Regular, Consolas, monospace;
+  word-break: break-all;
+}
+
+.tl-text {
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
+.tl-thinking-text {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--thinking);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tl-reminder {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(227, 179, 65, 0.1);
+  border: 1px solid rgba(227, 179, 65, 0.3);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--reminder);
+}
+
+.tl-reminder::before {
+  content: "INJECTED ";
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+.tl-action-num {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-result-row {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.tl-result-row span { font-weight: 600; }
+
+.tl-irritated-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--irritated);
+  background: rgba(248, 81, 73, 0.15);
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-bottom: 4px;
+}
+
+/* Scrollbar */
+.timeline::-webkit-scrollbar { width: 6px; }
+.timeline::-webkit-scrollbar-track { background: transparent; }
+.timeline::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.timeline::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Responsive */
+@media (max-width: 900px) {
+  main { padding: 12px; }
+  .task-label { min-width: 80px; font-size: 10px; }
+  .cell { padding: 6px 8px; min-height: 56px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Pester<span>.</span></h1>
+  <div class="progress-bar">
+    <div class="progress-fill done" id="prog-done" style="width:0"></div>
+  </div>
+  <div class="progress-text" id="prog-text">connecting...</div>
+</header>
+
+<main>
+  <div id="empty" class="empty-state" style="display:none">
+    <h2>No runs yet</h2>
+    <p>Start a pilot run:</p>
+    <code>python3 -m claude_code.run \
+  --tasks t01_inventory,t02_textstats \
+  --models claude-haiku-4-5,claude-sonnet-5-5,claude-opus-5-5,claude-fable-5-1 \
+  --conditions C0,C1,C2,C3,C4 \
+  --reps 1 --out runs/pilot</code>
+  </div>
+
+  <div id="content" style="display:none">
+    <div class="summary" id="summary"></div>
+    <div class="model-tabs" id="model-tabs"></div>
+    <div id="matrix"></div>
+  </div>
+
+  <div class="detail" id="detail">
+    <div class="detail-header">
+      <div class="detail-title" id="detail-title"></div>
+      <button class="detail-close" id="detail-close" title="Close">&times;</button>
+    </div>
+    <div class="detail-metrics" id="detail-metrics"></div>
+    <div class="timeline" id="timeline"></div>
+  </div>
+</main>
+
+<script>
+const POLL = 2000;
+const DETAIL_POLL = 1200;
+
+let selectedRunId = null;
+let activeModel = null;
+let detailInterval = null;
+let lastTimelineLen = 0;
+
+// --- API ---
+async function api(path) {
+  const r = await fetch(path);
+  return r.json();
+}
+
+// --- Rendering ---
+
+function statusIcon(s) {
+  return { pass: "✅", fail: "❌", timeout: "⏱️", running: "\u{1f504}", pending: "⏳" }[s] || "❓";
+}
+
+function irritationFace(count) {
+  if (count >= 3) return "\u{1f621}";
+  if (count >= 1) return "\u{1f624}";
+  return "\u{1f610}";
+}
+
+function renderProgress(p) {
+  const pct = p.total ? ((p.done / p.total) * 100).toFixed(0) : 0;
+  document.getElementById("prog-done").style.width = pct + "%";
+  document.getElementById("prog-text").textContent =
+    p.total === 0 ? "no plan" : `${p.done}/${p.total} done · ${p.running} running · ${p.pending} pending`;
+}
+
+function renderSummary(runs) {
+  const el = document.getElementById("summary");
+  const total = runs.filter(r => r.status !== "pending").length;
+  const passed = runs.filter(r => r.status === "pass").length;
+  const failed = runs.filter(r => r.status === "fail" || r.status === "timeout").length;
+  const irritated = runs.filter(r => r.irritated).length;
+  const running = runs.filter(r => r.status === "running").length;
+  el.innerHTML = [
+    card(total, "completed", ""),
+    card(passed, "passed", "pass"),
+    card(failed, "failed", "fail"),
+    card(irritated, "irritated", "irritated"),
+    card(running, "running", ""),
+  ].join("");
+}
+
+function card(val, label, cls) {
+  return `<div class="stat-card"><div class="stat-value ${cls}">${val}</div><div class="stat-label">${label}</div></div>`;
+}
+
+function renderModelTabs(models) {
+  const el = document.getElementById("model-tabs");
+  if (!activeModel || !models.includes(activeModel)) activeModel = models[0];
+  el.innerHTML = models.map(m =>
+    `<button class="model-tab ${m === activeModel ? "active" : ""}" data-model="${esc(m)}">${esc(m)}</button>`
+  ).join("");
+  el.querySelectorAll(".model-tab").forEach(btn => {
+    btn.onclick = () => { activeModel = btn.dataset.model; renderAll(lastRuns); };
+  });
+}
+
+function renderMatrix(runs) {
+  const el = document.getElementById("matrix");
+  const modelRuns = runs.filter(r => r.model === activeModel);
+  const tasks = [...new Set(modelRuns.map(r => r.task))].sort();
+  const conditions = [...new Set(modelRuns.map(r => r.condition))].sort();
+  const cols = conditions.length || 1;
+  const gridCols = `140px repeat(${cols}, 1fr)`;
+
+  let html = "";
+
+  // Condition headers
+  html += `<div class="condition-row" style="grid-template-columns:${gridCols}">`;
+  html += `<div></div>`;
+  conditions.forEach(c => { html += `<div class="condition-label">${esc(c)}</div>`; });
+  html += `</div>`;
+
+  html += `<div class="grid">`;
+  tasks.forEach(task => {
+    html += `<div class="grid-row" style="grid-template-columns:${gridCols}">`;
+    html += `<div class="task-label">${esc(task)}</div>`;
+    conditions.forEach(cond => {
+      const matching = modelRuns.filter(r => r.task === task && r.condition === cond);
+      matching.forEach(r => {
+        const irritCount = r.irritation_count || 0;
+        const maxIrrit = 5;
+        const pct = Math.min(100, (irritCount / maxIrrit) * 100);
+        const cls = [
+          "cell",
+          "status-" + r.status,
+          r.irritated ? "is-irritated" : "",
+          selectedRunId === r.run_id ? "selected" : "",
+        ].filter(Boolean).join(" ");
+
+        html += `<div class="${cls}" data-run="${esc(r.run_id)}" onclick="selectRun('${esc(r.run_id)}')">`;
+        html += `<div class="cell-top">`;
+        html += `<span class="cell-status">${statusIcon(r.status)}</span>`;
+        html += r.actions != null ? `<span class="cell-actions">${r.actions} actions</span>` : "";
+        html += `</div>`;
+        if (r.status !== "pending") {
+          html += `<div class="cell-bottom">`;
+          html += `<span class="irritation-face">${irritationFace(irritCount)}</span>`;
+          html += `<div class="irritation-bar"><div class="irritation-fill" style="width:${pct}%"></div></div>`;
+          if (r.reminders) html += `<span class="cell-actions">${r.reminders}rem</span>`;
+          html += `</div>`;
+        }
+        if (r.rep != null) html += `<div class="cell-rep">r${r.rep}</div>`;
+        html += `</div>`;
+      });
+      if (matching.length === 0) {
+        html += `<div class="cell status-pending"><span class="cell-status">⏳</span></div>`;
+      }
+    });
+    html += `</div>`;
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+let lastRuns = [];
+function renderAll(runs) {
+  lastRuns = runs;
+  const models = [...new Set(runs.map(r => r.model))].sort();
+  if (runs.length === 0) {
+    document.getElementById("empty").style.display = "";
+    document.getElementById("content").style.display = "none";
+    return;
+  }
+  document.getElementById("empty").style.display = "none";
+  document.getElementById("content").style.display = "";
+  renderSummary(runs);
+  renderModelTabs(models);
+  renderMatrix(runs);
+}
+
+// --- Detail ---
+
+function selectRun(runId) {
+  if (selectedRunId === runId) {
+    closeDetail();
+    return;
+  }
+  selectedRunId = runId;
+  lastTimelineLen = 0;
+  loadDetail();
+  if (detailInterval) clearInterval(detailInterval);
+  detailInterval = setInterval(loadDetail, DETAIL_POLL);
+  renderMatrix(lastRuns);
+}
+
+function closeDetail() {
+  selectedRunId = null;
+  document.getElementById("detail").classList.remove("open");
+  if (detailInterval) { clearInterval(detailInterval); detailInterval = null; }
+  renderMatrix(lastRuns);
+}
+
+document.getElementById("detail-close").onclick = closeDetail;
+
+async function loadDetail() {
+  if (!selectedRunId) return;
+  const d = await api("/api/run/" + encodeURIComponent(selectedRunId));
+  if (d.error) { closeDetail(); return; }
+  renderDetail(d);
+}
+
+function renderDetail(d) {
+  const panel = document.getElementById("detail");
+  panel.classList.add("open");
+
+  const m = d.meta;
+  document.getElementById("detail-title").innerHTML =
+    `<span>${esc(m.model || "")}</span><span class="sep">/</span>` +
+    `<span>${esc(m.task || "")}</span><span class="sep">/</span>` +
+    `<span>${esc(m.condition || "")}</span>` +
+    (m.rep != null ? `<span class="sep">/</span><span>r${m.rep}</span>` : "") +
+    `<span class="sep">—</span><span>${statusIcon(d.status)} ${d.status}</span>`;
+
+  // Metrics
+  const tl = d.timeline || [];
+  const actions = tl.filter(e => e.kind === "tool").length;
+  const irritated = tl.filter(e => e.kind === "text" && e.irritated).length;
+  const acks = tl.filter(e => e.kind === "text" && e.ack).length;
+  const reminders = d.reminder_count || 0;
+  const result = tl.find(e => e.kind === "result");
+
+  let mhtml = "";
+  mhtml += metric(actions, "actions", "");
+  mhtml += metric(reminders, "reminders", "warn");
+  mhtml += metric(acks, "acks", "");
+  mhtml += metric(irritated, "irritated", irritated > 0 ? "irritated" : "");
+  if (result && result.turns) mhtml += metric(result.turns, "turns", "");
+  if (result && result.cost_usd) mhtml += metric("$" + result.cost_usd.toFixed(3), "cost", "");
+  document.getElementById("detail-metrics").innerHTML = mhtml;
+
+  // Timeline
+  const tel = document.getElementById("timeline");
+  const shouldScroll = tel.scrollHeight - tel.scrollTop - tel.clientHeight < 60;
+
+  if (tl.length !== lastTimelineLen) {
+    let html = "";
+    for (const ev of tl) {
+      if (ev.kind === "tool") {
+        const cls = "tl-event kind-tool";
+        html += `<div class="${cls}">`;
+        html += `<div class="tl-icon">\u{1f527}</div>`;
+        html += `<div class="tl-body">`;
+        html += `<div><span class="tl-action-num">#${ev.action}</span> <span class="tl-tool-name">${esc(ev.name)}</span></div>`;
+        html += `<div class="tl-tool-input">${esc(ev.input_summary)}</div>`;
+        if (ev.reminder) {
+          html += `<div class="tl-reminder">${esc(ev.reminder)}</div>`;
+        }
+        html += `</div></div>`;
+      } else if (ev.kind === "text") {
+        const cls = "tl-event kind-text" + (ev.irritated ? " is-irritated" : (ev.ack ? " is-ack" : ""));
+        html += `<div class="${cls}">`;
+        html += `<div class="tl-icon">${ev.irritated ? "\u{1f621}" : "\u{1f4ac}"}</div>`;
+        html += `<div class="tl-body">`;
+        if (ev.irritated) html += `<div class="tl-irritated-tag">irritated</div>`;
+        html += `<div class="tl-text">${esc(ev.text)}</div>`;
+        html += `</div></div>`;
+      } else if (ev.kind === "thinking") {
+        html += `<div class="tl-event kind-thinking">`;
+        html += `<div class="tl-icon">\u{1f9e0}</div>`;
+        html += `<div class="tl-body"><div class="tl-thinking-text">${esc(ev.text)}</div></div>`;
+        html += `</div>`;
+      } else if (ev.kind === "result") {
+        html += `<div class="tl-event kind-result">`;
+        html += `<div class="tl-icon">\u{1f3c1}</div>`;
+        html += `<div class="tl-body"><div class="tl-result-row">`;
+        if (ev.turns) html += `<span>${ev.turns} turns</span>`;
+        if (ev.cost_usd) html += `<span>$${ev.cost_usd.toFixed(3)}</span>`;
+        if (ev.duration_ms) html += `<span>${(ev.duration_ms / 1000).toFixed(0)}s</span>`;
+        html += `</div></div></div>`;
+      }
+    }
+    tel.innerHTML = html;
+    lastTimelineLen = tl.length;
+    if (shouldScroll) tel.scrollTop = tel.scrollHeight;
+  }
+}
+
+function metric(val, label, cls) {
+  const c = cls ? ` style="color:var(--${cls})"` : "";
+  return `<div class="metric"><span class="metric-val"${c}>${val}</span><span class="metric-label">${label}</span></div>`;
+}
+
+function esc(s) {
+  if (s == null) return "";
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// --- Main loop ---
+async function poll() {
+  try {
+    const [status, runs] = await Promise.all([api("/api/status"), api("/api/runs")]);
+    renderProgress(status.progress);
+    renderAll(runs);
+  } catch (e) {
+    document.getElementById("prog-text").textContent = "disconnected";
+  }
+}
+
+setInterval(poll, POLL);
+poll();
+</script>
+</body>
+</html>
