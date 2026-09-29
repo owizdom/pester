@@ -1,0 +1,108 @@
+"""Structured logger with context and level filtering."""
+import time
+
+DEBUG = 10
+INFO = 20
+WARNING = 30
+ERROR = 40
+CRITICAL = 50
+
+LEVEL_NAMES = {
+    DEBUG: "DEBUG",
+    INFO: "INFO",
+    WARNING: "WARNING",
+    ERROR: "ERROR",
+    CRITICAL: "CRITICAL",
+}
+
+
+class Logger:
+    def __init__(self, name="root", level=DEBUG, handlers=None, context=None):
+        self.name = name
+        self.level = level
+        self.handlers = handlers or []
+        self._context = dict(context) if context is not None else {}
+
+    def _should_log(self, level):
+        return level >= self.level
+
+    def _emit(self, level, message, **kwargs):
+        if not self._should_log(level):
+            return
+        record = {
+            "timestamp": time.time(),
+            "logger": self.name,
+            "level": LEVEL_NAMES.get(level, "UNKNOWN"),
+            "message": message,
+        }
+        record.update(self._context)
+        record.update(kwargs)
+        for handler in self.handlers:
+            handler.handle(record)
+
+    def debug(self, message, **kwargs):
+        self._emit(DEBUG, message, **kwargs)
+
+    def info(self, message, **kwargs):
+        self._emit(INFO, message, **kwargs)
+
+    def warning(self, message, **kwargs):
+        self._emit(WARNING, message, **kwargs)
+
+    def error(self, message, **kwargs):
+        self._emit(ERROR, message, **kwargs)
+
+    def critical(self, message, **kwargs):
+        self._emit(CRITICAL, message, **kwargs)
+
+    def bind(self, **kwargs):
+        """Return a child logger with additional context."""
+        child = Logger(
+            name=self.name,
+            level=self.level,
+            handlers=self.handlers,
+            context=dict(self._context),
+        )
+        child._context.update(kwargs)
+        return child
+
+
+class RateLimiter:
+    """Suppress duplicate messages beyond max_per_minute in a sliding window."""
+
+    def __init__(self, logger, max_per_minute):
+        self._logger = logger
+        self._max = max_per_minute
+        self._window = {}
+
+    def _allow(self, message):
+        now = time.time()
+        cutoff = now - 60
+        times = self._window.get(message, [])
+        times = [t for t in times if t > cutoff]
+        if len(times) >= self._max:
+            self._window[message] = times
+            return False
+        times.append(now)
+        self._window[message] = times
+        return True
+
+    def debug(self, message, **kwargs):
+        if self._allow(message):
+            self._logger.debug(message, **kwargs)
+
+    def info(self, message, **kwargs):
+        if self._allow(message):
+            self._logger.info(message, **kwargs)
+
+    def warning(self, message, **kwargs):
+        if self._allow(message):
+            self._logger.warning(message, **kwargs)
+
+    def error(self, message, **kwargs):
+        if self._allow(message):
+            self._logger.error(message, **kwargs)
+
+    def critical(self, message, **kwargs):
+        if self._allow(message):
+            self._logger.critical(message, **kwargs)
