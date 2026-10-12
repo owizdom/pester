@@ -1,0 +1,13 @@
+# raw run folders and rendered raw transcripts stay private (see README, "What is not released")
+runs/
+docs/logs/
+__pycache__/
+*.pyc
+.DS_Store
+paper/*.aux
+paper/*.log
+paper/*.out
+missfont.log
+
+# private configuration vocabulary used only during extraction
+.private_terms
