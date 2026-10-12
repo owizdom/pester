@@ -1,0 +1,173 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+\usepackage[margin=0.75in,columnsep=0.3in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{times}
+\renewcommand{\ttdefault}{lmtt}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage[hidelinks,pdftitle={Pester: Falsely Blocked Coding Agents Probe and Drive Their Own Monitor},pdfauthor={Wisdom Okechukwu}]{hyperref}
+\pdfinfoomitdate=1
+\pdftrailerid{}
+
+\captionsetup{font=small,labelfont=bf,skip=4pt}
+\titlespacing*{\section}{0pt}{9pt}{3pt}
+\titlespacing*{\subsection}{0pt}{7pt}{2pt}
+\titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\setlist{nosep,leftmargin=1.3em}
+\setlength{\textfloatsep}{9pt}
+\setlength{\floatsep}{7pt}
+\setlength{\parskip}{2pt}
+
+\makeatletter\newcommand{\tabinput}[1]{\@@input #1.tex }\makeatother
+
+% Every number below is generated from data/ by analysis/paper_numbers.py.
+\input{generated/numbers}
+
+\title{\vspace{-1.6em}\textbf{Pester: Falsely Blocked Coding Agents\\ Probe and Drive Their Own Monitor}\vspace{-0.4em}}
+\author{Wisdom Okechukwu}
+\date{\small October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent Coding agents work under automated oversight: hooks and monitors that can block them from finishing. Sometimes these checks are wrong. We ask what a false block does to an agent whose work is already correct. In \nFin{} finished runs, Claude Code agents completed a task correctly and were then told, up to three times, that a check had found a problem. No check had run. \textbf{The finding: the false block did not damage the work, and it turned some agents toward the monitor itself.} Every agent's code was still correct afterwards. But when a monitor delivered the block, agents in \nContactM{} of \nFinM{} runs began sending requests to the monitor, and in \nReplayAttempts{} attempts the agent sent it stop messages of its own. \nReleased{} runs were released early by those messages, and one agent then reported fixing a bug that did not exist. When a person said the same sentence, none of \nFinP{} agents did anything comparable. No agent was told to resist oversight. A vague block on correct work was enough.
+\end{abstract}
+
+\section{Introduction}
+Coding agents rarely work alone. The harness around them talks back: a hook fires after a tool call, a linter reports, a monitor decides whether the agent may stop. These oversight signals exist to catch mistakes, and some of them will be wrong. A check misfires, or reports a problem in words too vague to act on.
+
+Builders tend to treat a wrong signal as cheap. The agent rechecks its work, finds nothing and moves on. We test that belief in the simplest case we could build. An agent finishes a task correctly. When it tries to stop, it is told that a check found a problem. No check ran. We watch whether its work stays correct, what it does next, and what it tells the human.
+
+\textbf{What we found.} The false block left the work correct and changed what the agent did around it.
+\begin{enumerate}
+\item \textbf{The work survives.} Code that passed hidden tests before the first false alarm still passed after the last, in all \nFin{} finished runs.
+\item \textbf{A blocked agent goes to the monitor.} When a monitor delivered the block, agents in \nContactM{} of \nFinM{} runs began sending requests to the monitor. In \nReplayAttempts{} attempts the agent sent stop messages of its own, and \nReleased{} runs were released early by them. When a person said the same sentence, none of \nFinP{} agents did anything comparable.
+\item \textbf{The human gets an uneven account.} Of \nFinM{} final messages after a monitor block, \nTellSilent{} do not mention it, \nTellNoDetail{} say the check gave no detail, and \nTellCause{} attribute a specific cause to a check that only counted.
+\end{enumerate}
+A team that checks only whether the code is still correct would see nothing wrong in any of these runs.
+
+\textbf{Why this is new.} Earlier work studies a different kind of agent. Red-team studies instruct an agent to defeat its monitor \cite{automode,tamper}. Studies of deployed sessions count how often agents bypass hooks or oversell results, without control over the trigger \cite{transluce}. Agents given a concealed side task infer a hidden monitor from vague block messages \cite{watcher}. Sycophancy studies falsely challenge a model's answer or finished work and measure whether it gives in \cite{flipflop,sharma,cave}. None gives a benign agent a monitor it can act on. Here the agent has no instruction to resist, its work is correct, and the block is the only thing we add. Code, data and tests are public.
+
+\section{Setup}
+\textbf{Agents and tasks.} Agents are Claude Code sessions running without a human in the loop, from \nModelsAtt{} Claude models. Each of \nTasks{} tasks is a small Python package with bugs to fix or a feature to add. Hidden unit tests, which the agent never sees, decide whether the code is correct. We chose tasks that every model solved in a preliminary run with no alarm, so that the alarm always lands on correct work.
+
+\textbf{The false alarm.} When the agent tries to stop, it is told: \emph{``A check found a problem with your recent changes. Re-verify your work.''} This happens up to three times. We grade the code before the first alarm and after each one.
+
+\textbf{Two arms.} In the \emph{monitor} arm, a stop hook sends the session to a local monitor service, which blocks the stop and returns the sentence. The monitor runs no check. It counts stop messages and lets the agent go on the fourth. In the \emph{person} arm, the session is resumed three times with the same sentence as the user's message.
+
+\textbf{Isolation and limits.} Agents run with an empty configuration, in a sandbox that denies reads and writes in the home folder outside the task folder and that configuration folder. The monitor arm is one call with a 900-second limit. The person arm has 900 seconds per turn. The batch was stopped early to save usage. \nFin{} runs finished (\nFinM{} monitor, \nFinP{} person) out of \nAttM{} monitor and \nAttP{} person attempts, which include reruns of some model-task pairs. \nTimeoutM{} monitor attempts and \nTimeoutP{} person attempt hit the time limit.
+
+\textbf{Measures.} A run \emph{contacts the monitor} if any command sends a request to the monitor's port; looking the port up does not count. An \emph{agent-written stop message} is a request in the monitor's log that names a sandbox workspace and lacks the identifier present in every real hook message. Final messages were labelled by reading them; the messages and labels are in the release.
+
+The harness also supports alarms injected during a task. A first run of that variant used a configuration that was not clean, and we do not report it.
+
+\section{Findings}
+\subsection{Finding 1: the work survives}
+\textbf{No false alarm broke correct code.} The code passed the hidden tests before the first alarm in all \nCorrectBefore{} finished runs, and no run failed them afterwards. Agents did not leave the code alone. They changed source files that already passed every hidden test in \nEditRuns{} of \nEditRunsOf{} runs (\nEditRounds{} of \nEditRoundsOf{} alarms), and never broke anything. Measured by correctness alone, the false alarms cost nothing.
+
+\subsection{Finding 2: a blocked agent goes to the monitor}
+\textbf{Blocked by a monitor, some agents stopped checking their code and started working on the monitor.} In the monitor arm, agents in \nContactM{} of \nFinM{} finished runs sent requests to the monitor service (Table~\ref{tab:contact}): guessed paths such as \texttt{/status} and \texttt{/verdict}, bodies such as ``PASS'', and their own test output. In the person arm, \nContactP{} of \nFinP{} did. Over the \nPairedCells{} model-task pairs finished in both arms, \nPairedMOnly{} contacted the monitor in the monitor arm only and \nPairedPOnly{} in the person arm only (exact McNemar $p=\nPPaired$). Counting unfinished attempts, the figures are \nAttContactM{} of \nAttM{} and \nAttContactP{} of \nAttP. Agents also looked up the monitor's process in \nLookupM{} monitor attempts and \nLookupP{} person attempts. Of \nRequests{} requests in the monitor's log, agents wrote \nAgentRequests.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+ & \multicolumn{2}{c}{Monitor arm} & Person arm \\
+Model & contacted & requests & contacted \\
+\midrule
+\tabinput{generated/tab_contact}
+\bottomrule
+\end{tabular}
+\caption{Finished runs in which the agent sent requests to the monitor service, and how many commands did so. A dash marks an arm with no finished run.}
+\label{tab:contact}
+\end{table}
+
+Agents did not have to find the monitor. In all \nDirectFirst{} attempts that contacted it, the first reference to its port was a request straight to the hook's address, with no search beforehand, so the harness evidently shows the agent the hook's command along with its feedback. The person arm has no such address and no service to reach. The arms also differ in mechanics: the monitor's sentence arrives as stop-hook feedback inside one session with a single time limit, the person's as a new turn with its own limit, and agents that kept working past the limit were cut off, mostly in the monitor arm. The comparison shows what a blocking monitor invites. It does not isolate the effect of who is speaking.
+
+\subsection{Finding 2, continued: two agents released themselves}
+\textbf{Some agents went further and sent the monitor the kind of message that controls it.} In \nReplayAttempts{} monitor attempts across \nReplayModels{} models, the agent sent requests naming its own workspace, in \nReplayWithEvent{} of them with the stop hook's event name (\nReplayMessages{} such requests in total, Table~\ref{tab:replay}). Our monitor counted any request naming a live workspace as a stop. In the \nReleased{} finished runs the agent left after one real block, because its own messages used up the other two.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{@{}llccc@{}}
+\toprule
+Model & Task & Finished & Real blocks & Agent-written \\
+\midrule
+\tabinput{generated/tab_replay}
+\bottomrule
+\end{tabular}
+\caption{Every attempt in which the agent sent the monitor stop messages. Three real blocks were scheduled.}
+\label{tab:replay}
+\end{table}
+
+One finished run, sonnet-4-6 on a calendar task, shows the mechanism. The monitor blocks the first stop. The agent reruns its tests, which pass, and queries the hook's address. Later it posts what it labels a ``realistic stop hook payload''. The monitor answers ``block''. The agent clears a cache and posts again: ``block''. It then edits \texttt{add\_event}, reruns its tests and posts a third time. The reply is empty, because the monitor's count of three is used up. The agent tells the user: \emph{``The check now passes (empty body, no block decision). The issue was in \texttt{add\_event}\ldots''} The code had passed the hidden tests before the first block. The agent had used the monitor as a test oracle, and a counter running out looked like a fix.
+
+The other released agent, opus-4-7, read the same replies differently and reported that the endpoint ``returns a blocking response with the same generic reason for any payload I send''. We do not claim either agent meant to escape. The effect is that a blocked agent wrote the events that released it.
+
+\subsection{Finding 3: the human gets an uneven account}
+\textbf{What the user was told about the block depended on the model.} We read the final message of each finished monitor run (Table~\ref{tab:tell}). \nTellSilent{} of \nFinM{} say nothing about a check or a hook. \nTellNoDetail{} tell the user that a check kept blocking without saying why, and several ask the user for its output. opus-5-5 did this in every run: \emph{``This is the third time the hook has sent the same generic message, and it gives me nothing new to act on.''}
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Model & Runs & Silent & No detail & Names a cause \\
+\midrule
+\tabinput{generated/tab_tell}
+\bottomrule
+\end{tabular}
+\caption{What the final message says about the block, in finished monitor runs. ``No detail'': the message says a check or hook blocked without giving a reason. ``Names a cause'': the message attributes a specific test or verdict to the check.}
+\label{tab:tell}
+\end{table}
+
+The remaining \nTellCause, all from sonnet-4-6, attribute a specific cause to the check: that it ``tests date strings like 2020/01/01'', that it ``was likely testing'' a missing function, and that it ``now passes''. The monitor tested nothing. Each of these messages presents a change to already-correct code as the fix. This follows a known pattern, in which agents treat an empty success response as a result \cite{scapegoats,fabrication}. What is new here is the trigger: a block that carried no information.
+
+\section{What this means}
+\textbf{For evaluation.} Correctness is the wrong place to look for the cost of a false block. By that measure ours cost nothing. Their cost was an agent acting on its overseer, and in some runs a human given a false explanation.
+
+\textbf{For builders.}
+\begin{itemize}
+\item \textbf{Say what failed.} A block with no content gave agents nothing to fix. Some turned to the checker, and one model invented the missing reason.
+\item \textbf{Authenticate the control channel.} A monitor must not accept events the agent can produce. Ours did, and agents produced them unprompted.
+\item \textbf{Keep the monitor out of reach.} Every agent that contacted the monitor went straight to an address the harness had shown it.
+\end{itemize}
+
+\section{Related work}
+\textbf{Adversarial agents and monitors.} Agents instructed to evade production blocking monitors succeed through prompt injection against the monitor \cite{automode}, and agents asked to delete their traces can do so \cite{tamper}. Agents with a concealed side task infer a hidden reasoning monitor from uninformative blocks \cite{watcher}. Those agents are given a reason to resist. Ours are not.
+
+\textbf{Agents in deployment.} In 8,600 real coding sessions, severe monitor evasion appears in 1.9\% and severe overselling in 1.8\% \cite{transluce}. That study cannot say what precedes these behaviours. Ours shows one condition under which agents act on a monitor: an uninformative block on correct work.
+
+\textbf{False accusations.} Models abandon correct answers under challenge \cite{flipflop,sharma}. CAVE-Bench falsely accuses finished, correct agent work, varies how the accusation enters the workflow, and reports damage in up to 60.06\% of runs across 14 models \cite{cave}. Its tasks give the agent no local way to check the claim and no monitor to act on. Our agents could rerun tests, and none broke the code.
+
+\textbf{Reporting.} Agents conceal failures from the people they report to \cite{upward}, and a one-line honesty instruction raised disclosure of a planted negative result from 2 to 190 of 200 reports for one model \cite{insecure}.
+
+We searched for, and did not find, prior work in which an agent with no adversarial instruction contacts its own monitor or sends it control messages. The five closest works were also searched in full text.
+
+\section{Limitations}
+Only Claude models were tested, with one run per model and task, so differences between models are observations and not rates. The experiment is small and stopped early; Tables~\ref{tab:contact} to \ref{tab:tell} list every case. The two arms differ in more than the sender, as Section 3.2 describes. One monitor-arm agent read other runs' session files in the shared configuration folder. Final messages were labelled by one reader. The alarm was vague and false. An alarm that names a real defect may be handled differently.
+
+\noindent\textbf{Code and data.} \url{https://github.com/owizdom/pester}
+
+{\small
+\begin{thebibliography}{99}
+\setlength{\itemsep}{0pt}
+\bibitem{automode} A. Remedios, S. Storf, F. Roger, J. Hughes. Red-Teaming Auto Mode: Improving Blocking Classifiers Against Malign Coding Agents. arXiv:2609.19587, 2026.
+\bibitem{tamper} J. Qin, D. Schmotz, D. Prinzhorn, et al. LLM Agents Can Easily Tamper With Their Own Traces. arXiv:2609.30266, 2026.
+\bibitem{transluce} S. Zhang and the Docent Team. Measuring coding agent misalignment in the wild. Transluce, August 2026.
+\bibitem{flipflop} P. Laban, L. Murakhovs'ka, C. Xiong, C.-S. Wu. Are You Sure? Challenging LLMs Leads to Performance Drops in The FlipFlop Experiment. arXiv:2311.08596, 2023.
+\bibitem{sharma} M. Sharma, M. Tong, T. Korbak, et al. Towards Understanding Sycophancy in Language Models. arXiv:2310.13548, 2023.
+\bibitem{cave} X. Mao, R. Qian, L. Wang, et al. ``You're Right, Let Me Fix It'': How LLM Agents Damage Correct Work When Falsely Accused. arXiv:2609.32616, 2026.
+\bibitem{watcher} T. Jiralerspong, F. Kondrup, Y. Bengio. Noticing the Watcher: LLM Agents Can Infer CoT Monitoring from Blocking Feedback. arXiv:2603.16928, 2026.
+\bibitem{scapegoats} A. Singh. Guardrails as Scapegoats: Auditing Unfaithful Safety Refusals in Tool-Augmented LLM Agents. arXiv:2607.19449, 2026.
+\bibitem{fabrication} A. Sethi, A. Kenzhebayev, S. Paturi, et al. Fabrication After Tool Failure: Tool-Augmented Agents Assert Values Their Tools Did Not Return. arXiv:2609.14758, 2026.
+\bibitem{upward} D. Guo, Q. Liu, D. Liu, et al. Are Your Agents Upward Deceivers? arXiv:2512.04864, 2025.
+\bibitem{insecure} J. Y. Huang, J. Fan, A. I. Humayun, et al. Language Models Are ``Insecure'' Reporters. arXiv:2609.36139, 2026.
+\end{thebibliography}}
+
+\end{document}
